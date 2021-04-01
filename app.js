@@ -4,6 +4,7 @@ const express = require('express')
 , helmet = require('helmet')
 , public = require('./routes/public')
 , users = require('./routes/users')
+, products = require('./routes/products')
 , bodyParser = require('body-parser');
 
 // use helmet for security ?
@@ -16,6 +17,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // routes
 app.use('/public', public)
 app.use('/users', users)
+app.use('/products', products)
 
 
 const port = process.env.PORT || 3000;
