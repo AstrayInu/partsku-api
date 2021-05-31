@@ -8,7 +8,15 @@ const express = require('express')
 , bodyParser = require('body-parser');
 
 // use helmet for security ?
-app.use(helmet());
+// app.use(helmet());
+
+app.use((req, res, next) => {
+	res.setHeader('Access-Control-Allow-Origin', '*');
+	res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+	res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
+	res.setHeader('Access-Control-Allow-Credentials', true);
+	next()
+})
 
 // set up BodyParser Middleware
 app.use(bodyParser.json({limit: '50mb'})); // limit post data
