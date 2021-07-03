@@ -4,6 +4,7 @@ const express = require('express')
 , helmet = require('helmet')
 , public = require('./routes/public')
 , users = require('./routes/users')
+, sellers = require('./routes/sellers')
 , products = require('./routes/products')
 , bodyParser = require('body-parser');
 
@@ -25,6 +26,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // routes
 app.use('/public', public)
 app.use('/users', users)
+app.use('/sellers', sellers)
 app.use('/products', products)
 
 

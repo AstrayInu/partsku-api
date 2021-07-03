@@ -1,9 +1,11 @@
+const e = require('express')
 const db = require('../utils/db')
 	, moment = require('moment')
 	, passwordValidator = require('password-validator')
 	, encryption = require('../utils/encryption')
 	, bodyParser = require('body-parser')
 	, nodemailer = require('nodemailer')
+	, _ = require("lodash")
 
 exports.addAdmin = async (req, res) => {
 	try {
@@ -61,4 +63,35 @@ exports.sendEmail = async (req, res) => {
 	} catch (e) {
 		console.log(e)
 	}
+}
+
+exports.getBrands = (req, res) => {
+	try {
+		db.execute(db.partsku, `SELECT * FROM brand_directory`).then( result => {
+			// console.log("===>", result)
+			res.json(result)
+		}).catch( e => {
+
+		})
+	} catch (e) {
+		
+	}
+}
+
+exports.getCategory = async (req, res) => {
+	try {
+		let result = await db.execute(db.partsku, `SELECT * FROM parts_directory`)
+		// console.log(result)
+		res.json(result)
+	} catch (e) {
+		
+	}
+}
+
+
+
+exports.testGetAPI = async (req, res) => {
+	let yaya = await db.execute(db.partsku, `SELECT * FROM users`)
+	console.log("==>",yaya)
+	res.json(yaya)
 }

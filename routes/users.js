@@ -16,15 +16,19 @@ router.post("/", user.createUser)
 router.get("/:id", user.getUserData)
 router.get("/checkUser", user.checkUser)
 router.put("/:id", user.updateUserData)
-router.post("/profilePicture", 
-  upload.fields([{ name: "imgData", maxCount: 1}]), 
-  user.profilePicture
-);
+// router.post("/profilePicture", 
+//   upload.fields([{ name: "imgData", maxCount: 1}]), 
+//   user.profilePicture
+// );
+router.post("/profilePicture", user.profilePicture)
 
 router.post("/login", user.login)
 router.post("/logout", user.logout)
 router.post("/forgot-password", user.sendEmailForgotPassword)
 router.post("/reset-password", user.resetPassword)
 
+router.get("/cart/:id", user.getCartData)
+router.post("/cart/add", user.updateCart)
+router.delete("/cart/delete", user.deleteCartItem)
 
 module.exports = router;

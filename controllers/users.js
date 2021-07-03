@@ -3,18 +3,19 @@ const _ = require("lodash")
 const jwt = require('jsonwebtoken')
 const moment = require('moment')
 const mv = require('mv')
+const { response } = require('express')
 
 const db = require('../utils/db')
 const encryption = require("../utils/encryption")
 const message = require("../utils/message")
-const { response } = require('express')
+const { cloudinary } = require("../utils/cloudinary")
 const secret = process.env.secret
 
 
 exports.createUser = async (req, res) => {
   try {
     const schema = new passwordValidator();
-    const { email, pass } = req.body
+    const { fname, lname, email, pass } = req.body
 
     // check if email is registered already
     let check = await db.execute(db.partsku, `SELECT * FROM users WHERE email = ?`, email)
@@ -44,10 +45,11 @@ exports.createUser = async (req, res) => {
       if(schema.validate(pass)) {
         const attributes = {
           dob: null,
-          firstname: '',
-          lastname: '',
+          name: `${fname.trim()} ${lname.trim()}`,
           phone_number: 0,
-          address: null
+          address: null,
+          cart: [],
+          wishlist: []
         }
 
         // encrypt pass
@@ -92,6 +94,7 @@ exports.createUser = async (req, res) => {
     }
 
   } catch (e) {
+    console.log(e)
     res.status(400).json(e)
   }
 }
@@ -107,6 +110,7 @@ exports.getUserData = (req, res) => {
 
       db.execute(db.partsku, check, id).then((data) => {
         if(data.length > 0) {
+          console.log("==>", data)
           let item = _.reduce(data) // to move actual data from an array casing
           let attr = JSON.parse(item.attributes) // parse json so it's readable and accessible
           item.attributes = attr
@@ -126,80 +130,112 @@ exports.getUserData = (req, res) => {
 }
 
 exports.checkUser = (req, res) => {
-  let { email } = req.body
+  try {
+    console.log("huwih")
+    let { email } = req.body
 
-  db.execute(db.partsku, `SELECT * FROM users WHERE email = ?`, email).then( response => {
-    console.log(response)
-    if(response.length > 0) res.json("User found!")
-    else res.status(404).json("User not found")
-  }).catch( e => {
-    res.status(400).json(e)
-  })
+    db.execute(db.partsku, `SELECT * FROM users WHERE email = ?`, email).then( response => {
+      console.log(response)
+      if(response.length > 0) res.json("User found!")
+      else res.json({msg: "User not found"})
+    }).catch( e => {
+      res.status(400).json(e)
+    })
+  } catch (e) {
+    console.log("check user error", e)
+  }
 }
 
 exports.updateUserData = async (req, res) => {
   try {
-    let data =  req.body.data
-      , attr = data.attributes
+    let { name, email, phone_number, address } = req.body
       , uid = req.params.id
-      , check = db.execute(db.partsku, `SELECT * FROM users WHERE uid = ?`, uid)
-
+      , check = await db.execute(db.partsku, `SELECT * FROM users WHERE uid = ?`, uid)
+      , code, msg
+    // console.log("BODY", req.body)
     if(check.length > 0) {
       let userData = _.reduce(check)
-        , userAttr = JSON.parse(userData.attributes)
+      , userAttr = JSON.parse(userData.attributes)
 
       // if user updates email
-      let emailCheck = db.execute(db.partsku, `SELECT * FROM users WHERE email = ?`, data.email)
-      if(emailCheck.length > 0) {
-        res.status(400).json(`Email yang anda input sudah digunakan!`)
+      let emailCheck = await db.execute(db.partsku, `SELECT uid, email, phone_number FROM users WHERE email = ? OR phone_number = ?`, [email, phone_number]).then(result => {
+        let checkEmailDuplication = result.filter(x => (x.uid != uid && x.email === email))
+        let checkPhoneDuplication = result.filter(x => (x.uid != uid && x.phonenumber === phone_number))
+
+        if (checkEmailDuplication.length > 0) return { code: 403, msg: "Maaf, Email Sudah Digunakan." }
+        else if (checkPhoneDuplication.length > 0) return { code: 403, msg: "Maaf, Nomor Telepon Sudah Digunakan." }
+        else return null;
+      })
+      console.log(emailCheck)
+      if(emailCheck) res.status(403).json(emailCheck.message)
+
+      if(name) {
+        userAttr.name = name.trim()
+        delete userAttr.firstname
+        delete userAttr.lastname
       }
-      data.attributes = JSON.stringify(attr)
-      data.updated_at = new Date()
+      if(address) userAttr.address = await address
+
+      let data = {
+        email,
+        phone_number,
+        attributes: await JSON.stringify(userAttr),
+        updated_at: new Date()
+      }
       db.execute(db.partsku, `UPDATE users SET ? WHERE uid = ?`, [data, uid]).then((result) => {
-        res.json('Data telah tersimpan')
+        data.attributes = JSON.parse(data.attributes)
+        res.json({data, msg: 'Data telah tersimpan'})
+      }).catch( e => {
+        res.json({err: e})
+        console.log("ERROR DB FINAL",e)
       })
     } else {
-      res.status(404).json(`User with userid of ${uid} is not found`)
+      res.status(400).json(`User with userid of ${uid} is not found`)
     }
   } catch (e) {
-
+    res.json({err: e})
+    console.log("CATCH", e)
   }
 }
 
 exports.login = async (req, res) => {
-  let { email, password } = req.body
-    , query = `SELECT * FROM users WHERE email = ?`
-  console.log(req)
   try {
+    let { email, password } = req.body
+      , query = `SELECT * FROM users WHERE email = ?`
+
     // check if email exists
     let user = await db.execute(db.partsku, query, email)
     if(user.length > 0) {
       // validate pass
-      if(encryption.validatePass(data.password, user[0].pass)) {
+      if(encryption.validatePass(password, user[0].pass)) {
+        // console.log("==>", user)
         user = _.reduce(user)
         const attr = JSON.parse(user.attributes)
-        const type = (user.sid) ? 'seller' : 'user';
+        const type = (user.type === 0) ? 'admin' : (user.type === 1) ? 'user' : 'seller';
         const session_id = Date.now();
         const payload = (user.sid) ? { id: user.id, type, session_id, sid: user.sid } : { id: user.id, type, session_id, sid: null }
         const token = jwt.sign(payload, secret, { expiresIn: "3h" });
 
-        const sqlData = {
+        let sqlData = {
           token,
           validated: 1,
-          email: data.email,
+          email: email,
           type,
           expired: moment().add(3, "h").format("YYYY-MM-DD HH:mm:ss")
         }
 
         await db.execute(db.partsku, 'INSERT INTO sessions SET ?', sqlData)
         sqlData.msg = `login success!`
-        sqlData.id = user.id
-        sqlData.name = `${attr.firstname} ${attr.lastname}`
+        sqlData.id = user.uid
+        sqlData.name = attr.name
         sqlData.profPicture = user.picture
+        sqlData.phone_number = user.phone_number
+        sqlData.attributes = attr
 
-        let sellerData = await db.execute(db.partsku, `SELECT * FROM sellers WHERE email = ?`, email)
+        let sellerData = await db.execute(db.partsku, `SELECT * FROM sellers WHERE uid = ? AND status = 1`, user.uid)
+        console.log(sellerData)
         if(sellerData.length > 0) {
-          sqlData.sid = sellerData.sid;
+          sqlData.sid = sellerData[0].sid;
           // sqlData.seller = { is_active: user.is_active, dealer_code: user.dealer_code }
           // sqlData.sellerPicture = user.sellerPicture
         }
@@ -214,13 +250,18 @@ exports.login = async (req, res) => {
 }
 
 exports.logout = async (req, res) => {
-  if(req.body.token) {
-    db.execute(db.partsku, `UPDATE sessions SET validated = 0 WHERE token = ?`, req.body.token).then(() => {
-      res.json(`Logout Success!`)
-    }).catch((reason) => {
-      console.log({res, reason})
-      res.json(JSON.parse(reason.response.body))
-    })
+  try {
+    if(req.body.token) {
+      db.execute(db.partsku, `UPDATE sessions SET validated = 0 WHERE token = ?`, req.body.token).then(() => {
+        res.json({msg: `Logout Success!`})
+      }).catch((reason) => {
+        console.log( reason)
+        res.json(JSON.parse(reason.response.body))
+      })
+    } else res.status(500).json({error: `Token not found`})
+  } catch (e) {
+    console.log(e)
+    res.status(500).json({error: e})
   }
 }
 
@@ -307,39 +348,26 @@ exports.resetPassword = (req, res) => {
   }
 }
 
-exports.profilePicture = (req, res) => {
-  if(!req.files.imgData) {
-    res.status(404).json('Image is missing')
-  }
+exports.profilePicture = async (req, res) => {
+  try {
+    let { imgData, uid} = req.body
 
-  let { originalname, path} = req.files.imgData[0]
-  , fileFormat = originalname.split('.').pop() // remove format
-  , uid = originalname.split('.')[0].split('-')[1]
-  , fileName = `${Date.now()}-${uid}.${fileFormat}`
-  , imgPath = `/user-${fileName}`
-  , source = path
-  , dest = `${path.dirname(__dirname)}/data/media${imgPath}`
-
-  mv(source, dest, { mkdirp: true }, async (err) => {
-    if(err) res.json(err)
-    else{
-      try {
-        let check = await db.execute(db.partsku, `SELECT * FROM users WHERE uid = ?`, uid)
-
-        if(check.length > 0) {
-          await db.execute(db.partsku, `UPDATE users SET attributes = JSON_SET(attributes, '$.picture', ?) WHERE uid = ?`, [imgPath, uid])
-
-          res.json({
-            id: uid,
-            msg: 'Gambar berhasil disimpan',
-            path: imgPath
-          })
-        }
-      } catch (e) {
-        res.json(e)
-      }
+    let cloudinaryResponse = await cloudinary.uploader.upload(imgData, {
+      upload_preset: 'user_default'
+    })
+    console.log(cloudinaryResponse);
+    if(cloudinaryResponse.url) {
+      db.execute(db.partsku, `UPDATE users SET attributes = JSON_SET(attributes, '$.imgUrl', ?) WHERE uid = ?`, [cloudinaryResponse.url, uid]).then(resposne => {
+        res.json({msg: 'Success upload new profile picture', url: cloudinaryResponse.url})
+      }).catch(e => {
+        console.log("DB catch", e)
+        res.json(e);
+      })
     }
-  })
+  } catch (e) {
+    console.log(e)
+    res.status(400).json(e)
+  }
 }
 
 exports.changePassword = async (req, res) => {
@@ -381,5 +409,73 @@ exports.changePassword = async (req, res) => {
   } catch(e) {
     console.log("ORRer", e)
     res.json(e)
+  }
+}
+
+exports.updateCart = async (req, res) => {
+  try {
+    let { uid, pid, quantity } = req.body
+      , sql
+
+    let check = await db.execute(db.partsku, `SELECT * FROM cart WHERE uid = ? AND pid = ?`, [uid, pid])
+    if(check.length > 0) {
+      check[0].quantity = Number(check[0].quantity) + Number(quantity)
+      sql = `UPDATE cart SET quantity = ${check[0].quantity} WHERE uid = ${uid} AND pid = ${pid}`
+    } else sql = `INSERT INTO cart SET uid = ${uid}, pid=${pid}, quantity=${quantity}`
+
+    db.execute(db.partsku, sql).then(result => {
+      console.log(result);
+      res.json("Item added to cart")
+    }).catch(e => {
+      console.log(e)
+      res.status(400).json(e)
+    })
+  } catch (e) {
+    console.log("Error catch", e)
+  }
+}
+
+exports.getCartData = async (req, res) => {
+  try {
+    let { id } = req.params
+      , sql = `SELECT c.uid, c.quantity, p.sid, s.attributes ->> '$.shop_name' AS shop_name, p.pid, p.sku, p.name, p.price, p.stock, p.attributes AS attr
+              FROM cart c
+              INNER JOIN products p ON c.pid = p.pid
+              INNER JOIN sellers s ON p.sid = s.sid
+              WHERE c.uid = ${id}`
+      , sellerSql = `SELECT DISTINCT p.sid, s.attributes ->> '$.shop_name' AS shop_name FROM cart c
+                    INNER JOIN products p ON c.pid = p.pid
+                    INNER JOIN sellers s ON p.sid = s.sid
+                    WHERE c.uid = ${id}`
+    let data = await db.execute(db.partsku, sql)
+      , seller = await db.execute(db.partsku, sellerSql)
+    
+    data.forEach(x => {
+      x.attr = JSON.parse(x.attr)
+      x.imgUrl = x.attr.imgUrl[0]
+      delete x.attr
+    });
+    // console.log(data)
+    res.json({data, seller})
+  } catch (e) {
+    console.log(e)
+    res.status(400).json(e)
+  }
+}
+
+exports.deleteCartItem = async (req, res) => {
+  try {
+    let {uid, pid} = req.body
+    // console.log("=========>", req.body)
+    
+    db.execute(db.partsku, `DELETE FROM cart WHERE uid = ${uid} AND pid = ${pid}`).then( result => {
+      res.json("Deleted item successfuly")
+    }).catch(e => {
+      console.log("DB CATCH",e)
+      res.status(400).json({err: "Whoops somehting went wrong", e})
+    })
+  } catch (e) {
+    console.log(e)
+    res.status(400).json({err: "Whoops somehting went wrong", e})
   }
 }
