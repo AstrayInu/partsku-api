@@ -48,8 +48,6 @@ exports.createUser = async (req, res) => {
           name: `${fname.trim()} ${lname.trim()}`,
           phone_number: 0,
           address: null,
-          cart: [],
-          wishlist: []
         }
 
         // encrypt pass

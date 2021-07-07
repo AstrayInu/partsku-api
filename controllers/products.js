@@ -17,7 +17,7 @@ exports.getProducts = async (req, res) => {
     , where = ``
     , arg = []
     
-    // console.log("DATA", limit)
+    console.log("DATA", q)
     if(q.sid) {
       where += ` AND sid = ?`
       arg.push(q.sid)
@@ -32,13 +32,15 @@ exports.getProducts = async (req, res) => {
     if(brand) {
       let brands = q.brand.split(',').map(x => x.toLowerCase())
 
-      where += ` AND brand = ?`
+      where += ` AND brand = ? OR attributes->>'$.carType' = ?`
       if (brands.length > 1)  {
         for(let item of brands) {
-          where += ` OR brand = ?`
+          where += ` OR brand = ? OR attributes->>'$.carType' = ?`
+          arg.push(item)
           arg.push(item)
         }
       } else {
+        arg.push(brand)
         arg.push(brand)
       }
     }

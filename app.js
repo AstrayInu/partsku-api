@@ -6,6 +6,7 @@ const express = require('express')
 , users = require('./routes/users')
 , sellers = require('./routes/sellers')
 , products = require('./routes/products')
+, commerce = require('./routes/commerce')
 , bodyParser = require('body-parser');
 
 // use helmet for security ?
@@ -28,6 +29,7 @@ app.use('/public', public)
 app.use('/users', users)
 app.use('/sellers', sellers)
 app.use('/products', products)
+app.use('/commerce', commerce)
 
 
 const port = process.env.PORT || 3000;
