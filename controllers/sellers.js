@@ -7,6 +7,7 @@ const mv = require('mv')
 const db = require('../utils/db')
 const encryption = require("../utils/encryption")
 const message = require("../utils/message")
+const { cloudinary } = require("../utils/cloudinary")
 const { response } = require('express')
 const secret = process.env.secret
 
@@ -40,7 +41,7 @@ exports.getSellerData = (req, res) => {
         let attr = JSON.parse(item.attributes) // parse string to json so it's readable and accessible
         item.attributes = attr
 
-        console.log("ITEM",item)
+        // console.log("ITEM",item)
         res.json(item)
       } else {
         res.status(400).json({err: `Seller not found`})
@@ -57,7 +58,7 @@ exports.getSellerData = (req, res) => {
 
 exports.createSeller = async (req, res) => {
   try {
-    const { shopName, waNum, shopAddress, uid } = req.body
+    let { shopName, waNum, papToko, papKtp, shopAddress, uid } = req.body
 
     // check if shop name already exists
     let check = await db.execute(db.partsku, `SELECT sid FROM sellers WHERE attributes ->> '$.url' = ?`, shopName)
@@ -74,12 +75,26 @@ exports.createSeller = async (req, res) => {
     let checkUrl = await db.execute(db.partsku, `SELECT sid FROM sellers WHERE attributes ->> '$.url' = ?`, linkToko)
     if(checkUrl.length > 0) linkToko += '-' + Math.floor(Math.random()*1000)
 
+    let ktpUpload = await cloudinary.uploader.upload(papKtp, {
+      upload_preset: 'ktp_default'
+    })
+    console.log(ktpUpload);
+    if(ktpUpload.url) papKtp = ktpUpload.url
+
+    let storePicUpload = await cloudinary.uploader.upload(papToko, {
+      upload_preset: 'shop_default'
+    })
+    console.log(storePicUpload);
+    if(storePicUpload.url) papToko = storePicUpload.url
+
     let attributes = {
       logo: null,
       waNum,
       shop_name: shopName,
       address: shopAddress,
-      url: linkToko
+      url: linkToko,
+      store_pic: papToko,
+      ktp_pic: papKtp
     }
 
     let setData = {
@@ -104,6 +119,7 @@ exports.createSeller = async (req, res) => {
       console.log("ERROR", e)
     })
   } catch(e) {
+    res.status(500).json(e)
     console.log("TRY ERROR", e)
   }
 }
@@ -127,14 +143,17 @@ exports.approveSeller = async (req, res) => {
 
 exports.storePicture = async (req, res) => {
   try {
-    let { imgData, uid} = req.body
+    let { imgData, uid } = req.body
 
     let cloudinaryResponse = await cloudinary.uploader.upload(imgData, {
       upload_preset: 'seller_default'
     })
     console.log(cloudinaryResponse);
     if(cloudinaryResponse.url) {
-      db.execute(db.partsku, `UPDATE sellers SET attributes = JSON_SET(attributes, '$.logo', ?) WHERE uid = ?`, [cloudinaryResponse.url, uid]).then(resposne => {
+      let getId = await db.execute(db.partsku, `SELECT attributes->>'$.public_id' AS public_id FROM sellers WHERE uid = ${uid}`)
+        , destroy = await cloudinary.uploader.destroy(getId[0].public_id)
+
+      db.execute(db.partsku, `UPDATE sellers SET attributes = JSON_SET(attributes, '$.public_id', ?), attributes = JSON_SET(attributes, '$.logo', ?)  WHERE uid = ?`, [cloudinaryResponse.public_id, cloudinaryResponse.url, uid]).then(resposne => {
         res.json({msg: 'Success upload new profile picture', url: cloudinaryResponse.url})
       }).catch(e => {
         console.log("DB catch", e)
