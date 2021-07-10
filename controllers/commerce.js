@@ -4,23 +4,71 @@ const { cloudinary } = require("../utils/cloudinary")
 
 exports.getTransaction = async (req, res) => {
   try {
-    let sql = `SELECT DISTINCT transaction_id, total_price, created_at, trf_proof FROM transaction_log WHERE`
+    let all = `SELECT * FROM transaction_log WHERE`
+      , admin = `SELECT DISTINCT transaction_id, total_price, status, approval, shipment_status, trf_proof FROM transaction_log WHERE`
 
-    if(req.query.tid) {
-      let { tid } = req.query
-        , singleData = await db.execute(db.partsku, `SELECT * FROM transaction_log WHERE status = 0 AND transaction_id = ?`, tid)
+    if(req.query.tid) { // get single transaction
+      let singleData = await db.execute(db.partsku, `${all} status = 0 AND transaction_id = ?`, req.query.tid)
 
       res.json({msg: 'Data found!', singleData})
-    } else if(req.query.uid) {
-      let sql1 = `SELECT DISTINCT transaction_id, total_price, status, approval, created_at, trf_proof FROM transaction_log`
-        , pending = await db.execute(db.partsku, `${sql1} WHERE uid = ${req.query.uid}`)
+    } else if(req.query.uid) { // get users transaction
+      let tidList = await db.execute(db.partsku, `SELECT DISTINCT transaction_id FROM transaction_log WHERE uid = ${req.query.uid} ORDER BY created_at DESC`)
+        , pending = await db.execute(db.partsku, `SELECT t.*, p.sid, s.attributes ->> '$.shop_name' AS shop_name, p.name, p.attributes AS attr, p.price FROM transaction_log t
+        INNER JOIN products p ON t.pid = p.pid
+        INNER JOIN sellers s ON s.sid = p.sid
+        WHERE t.uid = ${req.query.uid} ORDER BY t.created_at DESC`)
+        , sellerList = await db.execute(db.partsku, `SELECT DISTINCT s.sid, s.attributes ->> '$.shop_name' as shop_name FROM transaction_log t
+        INNER JOIN products p ON t.pid = p.pid
+        INNER JOIN sellers s ON s.sid = p.sid
+        WHERE t.uid = ${req.query.uid}`)
+        , status = await db.execute(db.partsku, `SELECT DISTINCT transaction_id AS tid, status, approval, trf_proof FROM transaction_log WHERE uid = ${req.query.uid}`)
 
-      res.json(pending)
-    } else {
-      let pending = await db.execute(db.partsku, `${sql} STATUS = 1 AND approval = 0`)
-        , approved = await db.execute(db.partsku, `${sql} approval = 1`)
+      pending.forEach(x => {
+        x.attr = JSON.parse(x.attr)
+        x.imgUrl = x.attr.imgUrl[0]
+        delete x.attr
+      });
 
-        res.json({pending, approved})
+      res.json({pending, tidList, sellerList, status})
+    } else if(req.query.sid) {
+      let tidList = await db.execute(db.partsku, `SELECT DISTINCT transaction_id AS tid FROM transaction_log t
+            INNER JOIN products p ON p.pid = t.pid
+            INNER JOIN sellers s ON s.sid = p.sid
+            WHERE s.sid = ${req.query.sid} AND t.approval = 1`)
+        , userList = await db.execute(db.partsku, `SELECT DISTINCT u.attributes->>'$.name' AS name, t.uid, u.attributes AS attr, u.phone_number FROM transaction_log t
+            INNER JOIN products p ON p.pid = t.pid
+            INNER JOIN sellers s ON s.sid = p.sid
+            INNER JOIN users u ON u.uid = t.uid
+            WHERE s.sid = ${req.query.sid} AND t.approval = 1`)
+        , pending = await db.execute(db.partsku, `SELECT t.*, p.attributes AS attr, p.name, p.sku FROM transaction_log t
+            INNER JOIN products p ON p.pid = t.pid
+            INNER JOIN sellers s ON s.sid = p.sid
+            INNER JOIN users u ON u.uid = t.uid
+            WHERE s.sid = ${req.query.sid} AND t.approval = 1`)
+        , status = await db.execute(db.partsku, `SELECT DISTINCT transaction_id AS tid, t.status, t.approval, trf_proof, t.shipment_status FROM transaction_log t
+            INNER JOIN products p ON p.pid = t.pid
+            INNER JOIN sellers s ON s.sid = p.sid
+            WHERE s.sid =  ${req.query.sid} AND t.approval = 1`)
+
+        pending.forEach(x => {
+          x.attr = JSON.parse(x.attr)
+          x.imgUrl = x.attr.imgUrl[0]
+          delete x.attr
+        });
+
+        userList.forEach(x => {
+          x.attr = JSON.parse(x.attr)
+          delete x.attr.imgUrl
+          delete x.attr.dob
+          delete x.attr.phone_number
+        })
+
+        res.json({tidList, userList, pending, status})
+    } else { // get All (admin)
+      let pending = await db.execute(db.partsku, `${admin} STATUS = 1 AND approval = 0`)
+      , approved = await db.execute(db.partsku, `${admin} approval = 1`)
+
+      res.json({pending, approved})
     }
   } catch (error) {
     console.log(error)
@@ -55,11 +103,20 @@ exports.newTransaction = async (req, res) => {
   }
 }
 
-exports.setApproval = (req, res) => {
+exports.setApproval = async (req, res) => {
   try {
     let data = req.body
+      , sql = `UPDATE transaction_log SET ? WHERE transaction_id = '${data.transaction_id}'`
 
-    db.execute(db.partsku, `UPDATE transaction_log SET ? WHERE transaction_id = '${data.transaction_id}'`, data).then(result => {
+    if(data.sid) {
+      let pids = await db.execute(db.partsku, `SELECT DISTINCT t.pid FROM transaction_log t INNER JOIN products p ON p.pid = t.pid WHERE p.sid = ${data.sid} AND transaction_id = '${data.tid}'`)
+      for(let x of pids) {
+        sql += ` AND pid = ${x.pid}`
+      }
+      delete data.sid
+    }
+    console.log(sql)
+    db.execute(db.partsku, sql, data).then(result => {
       res.json("Transaction updated!")
     }).catch(e => {
       console.log('DB CATCH', e)

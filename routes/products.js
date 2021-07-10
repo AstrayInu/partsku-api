@@ -22,5 +22,6 @@ router.post("/images/tmp",
 )
 router.post("/", product.createProduct)
 router.put("/:id", product.updateProduct)
+router.delete("/:id", product.deleteProduct)
 
 module.exports = router

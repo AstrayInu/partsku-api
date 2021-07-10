@@ -1,3 +1,4 @@
+const e = require("express");
 const { rearg, at } = require("lodash");
 const _ = require("lodash")
   , db = require('../utils/db')
@@ -17,7 +18,7 @@ exports.getProducts = async (req, res) => {
     , where = ``
     , arg = []
     
-    console.log("DATA", q)
+    // console.log("DATA", q)
     if(q.sid) {
       where += ` AND sid = ?`
       arg.push(q.sid)
@@ -67,7 +68,7 @@ exports.getProducts = async (req, res) => {
     sqlQuery += where
     sqlQuery += ` LIMIT ${offset},${limit}`
     sqlCount += where
-    console.log(sqlQuery)
+    // console.log(sqlQuery)
     let data = await db.execute(db.partsku, sqlQuery, arg.concat([Number(offset), Number(limit)]))
       , num = await db.execute(db.partsku, sqlCount, arg)
 
@@ -245,4 +246,19 @@ exports.createProduct = async (req, res) => {
 
 exports.updateProduct = async (req, res) => {
 
+}
+
+exports.deleteProduct = async (req, res) => {
+  try {
+    console.log(req)
+    db.execute(db.partsku, `DELETE FROM products WHERE pid = ${req.params.id}`).then(result => {
+      res.json("Item deleted!")
+    }).catch(e => {
+      console.log('DB CATCH', e)
+      res.status(500).json({err: e, msg: "Whoops something went wrong :(. Please contact our devs"})
+    })
+  } catch (error) {
+    console.log('error', error)
+    res.status(500).json({err: e, msg: "Whoops something went wrong :(. Please contact our devs"})
+  }
 }
