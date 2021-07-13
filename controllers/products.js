@@ -73,6 +73,9 @@ exports.getProducts = async (req, res) => {
       , num = await db.execute(db.partsku, sqlCount, arg)
 
     // console.log("NUM", num[0].num)
+    data.forEach(x => {
+      x.attributes = JSON.parse(x.attributes)
+    })
 
     let resData = {
       data: data,

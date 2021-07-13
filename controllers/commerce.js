@@ -13,23 +13,43 @@ exports.getTransaction = async (req, res) => {
       res.json({msg: 'Data found!', singleData})
     } else if(req.query.uid) { // get users transaction
       let tidList = await db.execute(db.partsku, `SELECT DISTINCT transaction_id FROM transaction_log WHERE uid = ${req.query.uid} ORDER BY created_at DESC`)
-        , pending = await db.execute(db.partsku, `SELECT t.*, p.sid, s.attributes ->> '$.shop_name' AS shop_name, p.name, p.attributes AS attr, p.price FROM transaction_log t
-        INNER JOIN products p ON t.pid = p.pid
-        INNER JOIN sellers s ON s.sid = p.sid
-        WHERE t.uid = ${req.query.uid} ORDER BY t.created_at DESC`)
+        , pending = await db.execute(db.partsku, `SELECT t.*, p.name, p.attributes AS attr, p.price FROM transaction_log t
+          INNER JOIN products p ON t.pid = p.pid
+          WHERE t.uid = ${req.query.uid} ORDER BY t.created_at DESC`)
+        , done = await db.execute(db.partsku, `SELECT t.*, p.sid, s.attributes ->> '$.shop_name' AS shop_name, p.name, p.attributes AS attr, p.price FROM transaction_log t
+          INNER JOIN products p ON t.pid = p.pid
+          INNER JOIN sellers s ON s.sid = p.sid
+          WHERE t.uid = ${req.query.uid} AND shipment_status ORDER BY t.created_at DESC`)
         , sellerList = await db.execute(db.partsku, `SELECT DISTINCT s.sid, s.attributes ->> '$.shop_name' as shop_name FROM transaction_log t
-        INNER JOIN products p ON t.pid = p.pid
-        INNER JOIN sellers s ON s.sid = p.sid
-        WHERE t.uid = ${req.query.uid}`)
-        , status = await db.execute(db.partsku, `SELECT DISTINCT transaction_id AS tid, status, approval, trf_proof FROM transaction_log WHERE uid = ${req.query.uid}`)
-
+          INNER JOIN products p ON t.pid = p.pid
+          INNER JOIN sellers s ON s.sid = p.sid
+          WHERE t.uid = ${req.query.uid}`)
+        , status = await db.execute(db.partsku, `SELECT DISTINCT transaction_id AS tid, p.sid, t.status, approval, shipment_status, trf_proof FROM transaction_log t
+          INNER JOIN products p ON t.pid = p.pid
+          WHERE t.uid = ${req.query.uid}`)
+        , final = []
+        , log = []
       pending.forEach(x => {
         x.attr = JSON.parse(x.attr)
         x.imgUrl = x.attr.imgUrl[0]
         delete x.attr
       });
+      tidList.forEach(tids => final.push({tid: tids.transaction_id}))
+      final.forEach(x => x.data = sellerList)
+      final.forEach(x => {
+        x.data.forEach(seller => {
+          if(!seller.data) seller.data = []
+          pending.forEach(async pend => {
+            delete pend.id
+            delete pend.type
+            if(pend.transaction_id === x.tid && pend.sid === seller.sid) {
+              await seller.data.push(pend)
+            }
+          })
+        })
+      })
 
-      res.json({pending, tidList, sellerList, status})
+      res.json({pending, tidList, sellerList, status, log, final})
     } else if(req.query.sid) {
       let tidList = await db.execute(db.partsku, `SELECT DISTINCT transaction_id AS tid FROM transaction_log t
             INNER JOIN products p ON p.pid = t.pid
@@ -85,6 +105,7 @@ exports.newTransaction = async (req, res) => {
     for(let x of body.cartData.data) {
       console.log(x)
       input.pid = x.pid
+      input.sid = x.sid
       input.quantity = x.quantity
       await db.execute(db.partsku, `INSERT INTO transaction_log SET ?`, input).catch(e => {
         console.log('DB CATCH', e)
@@ -109,13 +130,14 @@ exports.setApproval = async (req, res) => {
       , sql = `UPDATE transaction_log SET ? WHERE transaction_id = '${data.transaction_id}'`
 
     if(data.sid) {
-      let pids = await db.execute(db.partsku, `SELECT DISTINCT t.pid FROM transaction_log t INNER JOIN products p ON p.pid = t.pid WHERE p.sid = ${data.sid} AND transaction_id = '${data.tid}'`)
+      let pids = await db.execute(db.partsku, `SELECT DISTINCT t.pid FROM transaction_log t INNER JOIN products p ON p.pid = t.pid WHERE p.sid = ${data.sid} AND t.transaction_id = '${data.transaction_id}'`)
+
       for(let x of pids) {
         sql += ` AND pid = ${x.pid}`
       }
       delete data.sid
     }
-    console.log(sql)
+    // console.log(sql)
     db.execute(db.partsku, sql, data).then(result => {
       res.json("Transaction updated!")
     }).catch(e => {
