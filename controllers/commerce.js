@@ -82,39 +82,50 @@ exports.getTransaction = async (req, res) => {
       // res.json({tidList_done, final_done, final, status, status_done, pending, final, tidList})
       res.json({pending, done})
     } else if(req.query.sid) {
-      let tidList = await db.execute(db.partsku, `SELECT DISTINCT transaction_id AS tid FROM transaction_log t
-            INNER JOIN products p ON p.pid = t.pid
-            INNER JOIN sellers s ON s.sid = p.sid
-            WHERE s.sid = ${req.query.sid} AND t.approval = 1`)
-        , userList = await db.execute(db.partsku, `SELECT DISTINCT u.attributes->>'$.name' AS name, t.uid, u.attributes AS attr, u.phone_number FROM transaction_log t
-            INNER JOIN products p ON p.pid = t.pid
+      // let tidList = await db.execute(db.partsku, `SELECT DISTINCT transaction_id AS tid FROM transaction_log t
+      //       INNER JOIN products p ON p.pid = t.pid
+      //       INNER JOIN sellers s ON s.sid = p.sid
+      //       WHERE s.sid = ${req.query.sid} AND t.approval = 1`)
+      //   , userList = await db.execute(db.partsku, `SELECT DISTINCT u.attributes->>'$.name' AS name, t.uid, u.attributes AS attr, u.phone_number FROM transaction_log t
+      //       INNER JOIN products p ON p.pid = t.pid
+      //       INNER JOIN sellers s ON s.sid = p.sid
+      //       INNER JOIN users u ON u.uid = t.uid
+      //       WHERE s.sid = ${req.query.sid} AND t.approval = 1`)
+      //   , pending = await db.execute(db.partsku, `SELECT t.*, p.attributes AS attr, p.name, p.sku FROM transaction_log t
+      //       INNER JOIN products p ON p.pid = t.pid
+      //       INNER JOIN sellers s ON s.sid = p.sid
+      //       INNER JOIN users u ON u.uid = t.uid
+      //       WHERE s.sid = ${req.query.sid} AND t.approval = 1`)
+      //   , status = await db.execute(db.partsku, `SELECT DISTINCT transaction_id AS tid, t.status, t.approval, trf_proof, t.shipment_status FROM transaction_log t
+      //       INNER JOIN products p ON p.pid = t.pid
+      //       INNER JOIN sellers s ON s.sid = p.sid
+      //       WHERE s.sid =  ${req.query.sid} AND t.approval = 1`)
+      
+      let pending = await db.execute(db.partsku, `SELECT t.*, p.name, p.attributes AS pattr, p.price, u.phone_number, u.attributes AS uattr FROM transaction_log t
+            INNER JOIN products p ON t.pid = p.pid
             INNER JOIN sellers s ON s.sid = p.sid
             INNER JOIN users u ON u.uid = t.uid
-            WHERE s.sid = ${req.query.sid} AND t.approval = 1`)
-        , pending = await db.execute(db.partsku, `SELECT t.*, p.attributes AS attr, p.name, p.sku FROM transaction_log t
-            INNER JOIN products p ON p.pid = t.pid
+            WHERE s.sid = ${req.query.sid} AND t.approval = 1 AND NOT shipment_status = 3 ORDER BY t.created_at DESC`)
+        , done = await db.execute(db.partsku, `SELECT t.*, p.name, p.attributes AS pattr, p.price, u.phone_number, u.attributes AS uattr FROM transaction_log t
+            INNER JOIN products p ON t.pid = p.pid
             INNER JOIN sellers s ON s.sid = p.sid
             INNER JOIN users u ON u.uid = t.uid
-            WHERE s.sid = ${req.query.sid} AND t.approval = 1`)
-        , status = await db.execute(db.partsku, `SELECT DISTINCT transaction_id AS tid, t.status, t.approval, trf_proof, t.shipment_status FROM transaction_log t
-            INNER JOIN products p ON p.pid = t.pid
-            INNER JOIN sellers s ON s.sid = p.sid
-            WHERE s.sid =  ${req.query.sid} AND t.approval = 1`)
+            WHERE s.sid = ${req.query.sid} AND shipment_status = 3 ORDER BY t.created_at DESC`)
 
         pending.forEach(x => {
-          x.attr = JSON.parse(x.attr)
-          x.imgUrl = x.attr.imgUrl[0]
-          delete x.attr
+          x.pattr = JSON.parse(x.pattr)
+          x.uattr = JSON.parse(x.uattr)
+          x.imgUrl = x.pattr.imgUrl[0]
+          delete x.pattr
+        });
+        done.forEach(x => {
+          x.pattr = JSON.parse(x.pattr)
+          x.uattr = JSON.parse(x.uattr)
+          x.imgUrl = x.pattr.imgUrl[0]
+          delete x.pattr
         });
 
-        userList.forEach(x => {
-          x.attr = JSON.parse(x.attr)
-          delete x.attr.imgUrl
-          delete x.attr.dob
-          delete x.attr.phone_number
-        })
-
-        res.json({tidList, userList, pending, status})
+        res.json({pending, done})
     } else { // get All (admin)
       let pending = await db.execute(db.partsku, `${admin} STATUS = 1 AND approval = 0`)
       , approved = await db.execute(db.partsku, `${admin} approval = 1`)

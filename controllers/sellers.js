@@ -21,6 +21,9 @@ exports.getSellers = async (req, res) => {
     if(q.admin == 1) {
       let newSellers = await db.execute(db.partsku, `SELECT * FROM sellers WHERE status = 0`)
         , approved = await db.execute(db.partsku, `SELECT * FROM sellers WHERE status = 1`)
+      
+      newSellers.forEach(x => {x.attributes = JSON.parse(x.attributes)})
+      approved.forEach(x => {x.attributes = JSON.parse(x.attributes)})
 
       res.json({newSellers , approved})
     }
@@ -151,7 +154,7 @@ exports.storePicture = async (req, res) => {
     console.log(cloudinaryResponse);
     if(cloudinaryResponse.url) {
       let getId = await db.execute(db.partsku, `SELECT attributes->>'$.public_id' AS public_id FROM sellers WHERE uid = ${uid}`)
-        , destroy = await cloudinary.uploader.destroy(getId[0].public_id)
+      if(getId[0].public_id) cloudinary.uploader.destroy(getId[0].public_id)
 
       db.execute(db.partsku, `UPDATE sellers SET attributes = JSON_SET(attributes, '$.public_id', ?), attributes = JSON_SET(attributes, '$.logo', ?)  WHERE uid = ?`, [cloudinaryResponse.public_id, cloudinaryResponse.url, uid]).then(resposne => {
         res.json({msg: 'Success upload new profile picture', url: cloudinaryResponse.url})
