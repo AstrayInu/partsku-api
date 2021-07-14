@@ -12,44 +12,75 @@ exports.getTransaction = async (req, res) => {
 
       res.json({msg: 'Data found!', singleData})
     } else if(req.query.uid) { // get users transaction
-      let tidList = await db.execute(db.partsku, `SELECT DISTINCT transaction_id FROM transaction_log WHERE uid = ${req.query.uid} ORDER BY created_at DESC`)
-        , pending = await db.execute(db.partsku, `SELECT t.*, p.name, p.attributes AS attr, p.price FROM transaction_log t
-          INNER JOIN products p ON t.pid = p.pid
-          WHERE t.uid = ${req.query.uid} ORDER BY t.created_at DESC`)
-        , done = await db.execute(db.partsku, `SELECT t.*, p.sid, s.attributes ->> '$.shop_name' AS shop_name, p.name, p.attributes AS attr, p.price FROM transaction_log t
-          INNER JOIN products p ON t.pid = p.pid
-          INNER JOIN sellers s ON s.sid = p.sid
-          WHERE t.uid = ${req.query.uid} AND shipment_status ORDER BY t.created_at DESC`)
-        , sellerList = await db.execute(db.partsku, `SELECT DISTINCT s.sid, s.attributes ->> '$.shop_name' as shop_name FROM transaction_log t
-          INNER JOIN products p ON t.pid = p.pid
-          INNER JOIN sellers s ON s.sid = p.sid
-          WHERE t.uid = ${req.query.uid}`)
-        , status = await db.execute(db.partsku, `SELECT DISTINCT transaction_id AS tid, p.sid, t.status, approval, shipment_status, trf_proof FROM transaction_log t
-          INNER JOIN products p ON t.pid = p.pid
-          WHERE t.uid = ${req.query.uid}`)
-        , final = []
-        , log = []
+      let pending = await db.execute(db.partsku, `SELECT t.*, p.name, p.attributes AS attr, p.price, s.sid, s.attributes->>'$.shop_name' AS shop_name FROM transaction_log t
+            INNER JOIN products p ON t.pid = p.pid
+            INNER JOIN sellers s ON s.sid = p.sid
+            WHERE t.uid = ${req.query.uid} AND NOT shipment_status = 3 ORDER BY t.created_at DESC`)
+        , done = await db.execute(db.partsku, `SELECT t.*, p.name, p.attributes AS attr, p.price, s.sid, s.attributes->>'$.shop_name' AS shop_name FROM transaction_log t
+            INNER JOIN products p ON t.pid = p.pid
+            INNER JOIN sellers s ON s.sid = p.sid
+            WHERE t.uid = ${req.query.uid} AND shipment_status = 3 ORDER BY t.created_at DESC`)
+        // , tidList = await db.execute(db.partsku, `SELECT DISTINCT transaction_id FROM transaction_log WHERE uid = ${req.query.uid} AND NOT shipment_status = 3 ORDER BY created_at DESC`)
+        // , tidList_done = await db.execute(db.partsku, `SELECT DISTINCT transaction_id FROM transaction_log WHERE uid = ${req.query.uid} AND shipment_status = 3 ORDER BY created_at DESC`)
+        // , sellerList = await db.execute(db.partsku, `SELECT DISTINCT s.sid, s.attributes ->> '$.shop_name' as shop_name FROM transaction_log t
+        //     INNER JOIN products p ON t.pid = p.pid
+        //     INNER JOIN sellers s ON s.sid = p.sid
+        //     WHERE t.uid = ${req.query.uid} AND NOT shipment_status = 3`)
+        // , sellerList_done = await db.execute(db.partsku, `SELECT DISTINCT s.sid, s.attributes ->> '$.shop_name' as shop_name FROM transaction_log t
+        //     INNER JOIN products p ON t.pid = p.pid
+        //     INNER JOIN sellers s ON s.sid = p.sid
+        //     WHERE t.uid = ${req.query.uid} AND shipment_status = 3`)
+        // , status = await db.execute(db.partsku, `SELECT DISTINCT transaction_id AS tid, p.sid, t.status, approval, shipment_status, trf_proof FROM transaction_log t
+        //     INNER JOIN products p ON t.pid = p.pid
+        //     WHERE t.uid = ${req.query.uid} AND NOT shipment_status = 3`)
+        // , status_done = await db.execute(db.partsku, `SELECT DISTINCT transaction_id AS tid, p.sid, t.status, approval, shipment_status, trf_proof FROM transaction_log t
+        //     INNER JOIN products p ON t.pid = p.pid
+        //     WHERE t.uid = ${req.query.uid} AND shipment_status = 3`)
+        // , final = []
+        // , final_done = []
+
       pending.forEach(x => {
         x.attr = JSON.parse(x.attr)
         x.imgUrl = x.attr.imgUrl[0]
         delete x.attr
       });
-      tidList.forEach(tids => final.push({tid: tids.transaction_id}))
-      final.forEach(x => x.data = sellerList)
-      final.forEach(x => {
-        x.data.forEach(seller => {
-          if(!seller.data) seller.data = []
-          pending.forEach(async pend => {
-            delete pend.id
-            delete pend.type
-            if(pend.transaction_id === x.tid && pend.sid === seller.sid) {
-              await seller.data.push(pend)
-            }
-          })
-        })
-      })
+      // tidList.forEach(tids => final.push({tid: tids.transaction_id}))
+      // final.forEach(x => x.data = sellerList)
+      // final.forEach(x => {
+      //   x.data.forEach(seller => {
+      //     if(!seller.data) seller.data = []
+      //     pending.forEach(async pend => {
+      //       delete pend.id
+      //       delete pend.type
+      //       if(String(pend.transaction_id) === String(x.tid) && pend.sid === seller.sid) {
+      //         await seller.data.push(pend)
+      //       }
+      //     })
+      //   })
+      // })
 
-      res.json({pending, tidList, sellerList, status, log, final})
+      done.forEach(x => {
+        x.attr = JSON.parse(x.attr)
+        x.imgUrl = x.attr.imgUrl[0]
+        delete x.attr
+      });
+      // tidList_done.forEach(tids => final_done.push({tid: tids.transaction_id}))
+      // final_done.forEach(x => x.data = sellerList_done)
+      // final_done.forEach(x => {
+      //   x.data.forEach(seller => {
+      //     if(!seller.data) seller.data = []
+      //     done.forEach(async pend => {
+      //       delete pend.id
+      //       delete pend.type
+      //       if(pend.transaction_id === x.tid && pend.sid === seller.sid) {
+      //         await seller.data.push(pend)
+      //       }
+      //     })
+      //   })
+      // })
+
+      // res.json({tidList_done, final_done, final, status, status_done, pending, final, tidList})
+      res.json({pending, done})
     } else if(req.query.sid) {
       let tidList = await db.execute(db.partsku, `SELECT DISTINCT transaction_id AS tid FROM transaction_log t
             INNER JOIN products p ON p.pid = t.pid
