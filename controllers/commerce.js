@@ -169,8 +169,10 @@ exports.newTransaction = async (req, res) => {
 exports.setApproval = async (req, res) => {
   try {
     let data = req.body
+      , quantity = data.quantity
+      , pid = data.pid
       , sql = `UPDATE transaction_log SET ? WHERE transaction_id = '${data.transaction_id}'`
-
+    delete data.quantity
     if(data.sid) {
       let pids = await db.execute(db.partsku, `SELECT DISTINCT t.pid FROM transaction_log t INNER JOIN products p ON p.pid = t.pid WHERE p.sid = ${data.sid} AND t.transaction_id = '${data.transaction_id}'`)
 
@@ -181,6 +183,9 @@ exports.setApproval = async (req, res) => {
     }
     // console.log(sql)
     db.execute(db.partsku, sql, data).then(result => {
+      if(data.shipment_status == 1) {
+        db.execute(db.partsku, `UPDATE products SET stock = stock - ${quantity} WHERE pid = ${pid}`)
+      }
       res.json("Transaction updated!")
     }).catch(e => {
       console.log('DB CATCH', e)

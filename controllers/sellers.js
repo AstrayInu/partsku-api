@@ -17,7 +17,7 @@ exports.getSellers = async (req, res) => {
       , sql = `SELECT * FROM sellers WHERE 1`
       , where = ``
       , args = []
-    console.log(q)
+    // console.log(q)
     if(q.admin == 1) {
       let newSellers = await db.execute(db.partsku, `SELECT * FROM sellers WHERE status = 0`)
         , approved = await db.execute(db.partsku, `SELECT * FROM sellers WHERE status = 1`)
@@ -39,6 +39,31 @@ exports.getSellerData = (req, res) => {
     let { sid } = req.params
 
     db.execute(db.partsku, `SELECT * FROM sellers WHERE sid = ?`, sid).then(result => {
+      if(result.length > 0) {
+        let item = _.reduce(result) // to move actual data from an array casing
+        let attr = JSON.parse(item.attributes) // parse string to json so it's readable and accessible
+        item.attributes = attr
+
+        // console.log("ITEM",item)
+        res.json(item)
+      } else {
+        res.status(400).json({err: `Seller not found`})
+      }
+    }).catch(e => {
+      console.log("Error",e)
+      res.status(400).json({err: e})
+    })
+  } catch (e) {
+    console.log("ErroR", e)
+    res.status(400).json({err: e})
+  }
+}
+
+exports.getSellerDataUID = (req, res) => {
+  try {
+    let { uid } = req.params
+
+    db.execute(db.partsku, `SELECT * FROM sellers WHERE uid = ?`, uid).then(result => {
       if(result.length > 0) {
         let item = _.reduce(result) // to move actual data from an array casing
         let attr = JSON.parse(item.attributes) // parse string to json so it's readable and accessible

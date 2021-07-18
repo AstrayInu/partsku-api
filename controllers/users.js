@@ -108,7 +108,7 @@ exports.getUserData = (req, res) => {
 
       db.execute(db.partsku, check, id).then((data) => {
         if(data.length > 0) {
-          console.log("==>", data)
+          // console.log("==>", data)
           let item = _.reduce(data) // to move actual data from an array casing
           let attr = JSON.parse(item.attributes) // parse json so it's readable and accessible
           item.attributes = attr
@@ -129,11 +129,10 @@ exports.getUserData = (req, res) => {
 
 exports.checkUser = (req, res) => {
   try {
-    console.log("huwih")
     let { email } = req.body
 
     db.execute(db.partsku, `SELECT * FROM users WHERE email = ?`, email).then( response => {
-      console.log(response)
+      // console.log(response)
       if(response.length > 0) res.json("User found!")
       else res.json({msg: "User not found"})
     }).catch( e => {
@@ -164,7 +163,7 @@ exports.updateUserData = async (req, res) => {
         else if (checkPhoneDuplication.length > 0) return { code: 403, msg: "Maaf, Nomor Telepon Sudah Digunakan." }
         else return null;
       })
-      console.log(emailCheck)
+      // console.log(emailCheck)
       if(emailCheck) res.status(403).json(emailCheck.message)
 
       if(name) {
@@ -231,7 +230,7 @@ exports.login = async (req, res) => {
         sqlData.attributes = attr
 
         let sellerData = await db.execute(db.partsku, `SELECT * FROM sellers WHERE uid = ? AND status = 1`, user.uid)
-        console.log(sellerData)
+        // console.log(sellerData)
         if(sellerData.length > 0) {
           sqlData.sid = sellerData[0].sid;
           // sqlData.seller = { is_active: user.is_active, dealer_code: user.dealer_code }
