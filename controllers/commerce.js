@@ -100,7 +100,7 @@ exports.getTransaction = async (req, res) => {
       //       INNER JOIN products p ON p.pid = t.pid
       //       INNER JOIN sellers s ON s.sid = p.sid
       //       WHERE s.sid =  ${req.query.sid} AND t.approval = 1`)
-      
+
       let pending = await db.execute(db.partsku, `SELECT t.*, p.name, p.attributes AS pattr, p.price, u.phone_number, u.attributes AS uattr FROM transaction_log t
             INNER JOIN products p ON t.pid = p.pid
             INNER JOIN sellers s ON s.sid = p.sid
@@ -172,16 +172,22 @@ exports.setApproval = async (req, res) => {
       , quantity = data.quantity
       , pid = data.pid
       , sql = `UPDATE transaction_log SET ? WHERE transaction_id = '${data.transaction_id}'`
+      , join = ''
+      , cont
+    console.log(data)
     delete data.quantity
     if(data.sid) {
       let pids = await db.execute(db.partsku, `SELECT DISTINCT t.pid FROM transaction_log t INNER JOIN products p ON p.pid = t.pid WHERE p.sid = ${data.sid} AND t.transaction_id = '${data.transaction_id}'`)
 
       for(let x of pids) {
-        sql += ` AND pid = ${x.pid}`
+        join += `${x.pid} `
       }
+      cont = join.trim().split(' ').join()
+      sql += `AND pid in (${cont})`
       delete data.sid
     }
     // console.log(sql)
+    // console.log(cont)
     db.execute(db.partsku, sql, data).then(result => {
       if(data.shipment_status == 1) {
         db.execute(db.partsku, `UPDATE products SET stock = stock - ${quantity} WHERE pid = ${pid}`)

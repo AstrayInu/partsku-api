@@ -17,7 +17,7 @@ exports.getProducts = async (req, res) => {
     , sqlCount = `SELECT COUNT(*) AS num FROM products WHERE 1`
     , where = ``
     , arg = []
-    
+
     // console.log("DATA", q)
     if(q.sid) {
       where += ` AND sid = ?`
@@ -248,7 +248,59 @@ exports.createProduct = async (req, res) => {
 }
 
 exports.updateProduct = async (req, res) => {
+  try {
+    let data = req.body
+      , { id } = req.params
+      , urlName = data.name.toLowerCase().replace(/\/|\ |\./g,'-')
+      , usedData = {
+          sid: data.sid,
+          category: data.category,
+          status: data.stock > 0 ? 1 : 0, // 0 = not ready ; 1 = ready ; 2 = pre-order
+          condition: data.condition, // used or new
+          brand: data.brand.split(".")[0],
+          sku: data.sku.trim(),
+          name: data.name.trim(),
+          description: data.description,
+          price: Number(data.price),
+          stock: Number(data.stock),
+        }
+      , attributes = {
+          urlName,
+          carType: data.brand.split(".")[1]
+        }
+      , imgs = await db.execute(db.partsku, `SELECT attributes->>'$.imgUrl' AS img FROM products WHERE pid = ${id}`)
+      , parsedImg = JSON.parse(imgs[0].img)
 
+    if(data.imgData) {
+      for(let i=0 ; i<data.imgData.length ; i++) {
+        if(data.imgData[i]) {
+          let cloudinaryResponse = await cloudinary.uploader.upload(data.imgData[i], {
+            upload_preset: 'product_default'
+          })
+          if(cloudinaryResponse.url) {
+            parsedImg[i] = cloudinaryResponse.url
+            // parsedImg.push(cloudinaryResponse.url)
+          } else res.json({err: 'Something went wrong while uploading your product :('})
+        }
+      }
+      attributes.imgUrl = parsedImg
+    } else {
+      attributes.imgUrl = parsedImg
+    }
+
+    usedData.attributes = JSON.stringify(attributes)
+    delete data.imgData
+    db.execute(db.partsku, `UPDATE products SET ? WHERE pid = ${id}`, usedData).then(result => {
+      console.log('result', result)
+      res.json("Update Success")
+    }).catch(e => {
+      console.log('DB ERROR', e)
+      res.status(500).json(e)
+    })
+  } catch (e) {
+    console.log('ERROR', e)
+    res.status(500).json(e)
+  }
 }
 
 exports.deleteProduct = async (req, res) => {
@@ -263,5 +315,44 @@ exports.deleteProduct = async (req, res) => {
   } catch (error) {
     console.log('error', error)
     res.status(500).json({err: e, msg: "Whoops something went wrong :(. Please contact our devs"})
+  }
+}
+
+exports.getProductRating = async (req, res) => {
+  try {
+    let { pid, uid, sid, rid } = req.body
+      , select = `SELECT *`
+      , count = `SELECT COUNT(*) AS num`
+      , sql = ` FROM ratings WHERE `
+
+    if(pid) sql += `pid = ${pid}`
+    if(uid) sql += `uid = ${uid}`
+    if(sid) sql += `sid = ${sid}`
+    if(rid) sql += `id = ${rid}`
+
+    let num = await db.execute(db.partsku, `${count}${sql}`)
+    let data = await db.execute(db.partsku, `${select}${sql}`)
+
+    res.json({data, count: num[0].num})
+  } catch (e) {
+    console.log(e)
+    res.status(500).json(e)
+  }
+}
+
+exports.submitReview = async (req, res) => {
+  try {
+    let data = req.body
+
+    db.execute(db.partsku, `INSERT INTO ratings SET ?`, data).then(response => {
+      db.execute(db.partsku, `UPDATE transaction_log SET rated = ${response.insertId} WHERE id = ${data.tlog_id}`)
+      console.log('response', response)
+      res.json(response)
+    }).catch(e => {
+      console.log('DB ERROR', e)
+      res.status(500).json(e)
+    })
+  } catch (e) {
+    console.log('e', e)
   }
 }
