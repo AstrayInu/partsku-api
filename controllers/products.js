@@ -44,6 +44,8 @@ exports.getProducts = async (req, res) => {
         arg.push(brand)
       }
     }
+    
+    sqlQuery += q.sid ? '' : ` AND is_active = 1`
 
     if(sort) {
       switch (q.sort) {
@@ -65,7 +67,6 @@ exports.getProducts = async (req, res) => {
     }
 
     sqlQuery += where
-    sqlQuery += q.sid ? '' : ` AND is_active = 1`
     sqlQuery += ` LIMIT ${offset},${limit}`
     sqlCount += where
     // console.log(sqlQuery)
