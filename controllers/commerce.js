@@ -183,7 +183,7 @@ exports.setApproval = async (req, res) => {
         join += `${x.pid} `
       }
       cont = join.trim().split(' ').join()
-      sql += `AND pid in (${cont})`
+      sql += `AND pid IN (${cont})`
       delete data.sid
     }
     // console.log(sql)

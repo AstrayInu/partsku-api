@@ -1,5 +1,4 @@
 const e = require("express");
-const { rearg, at } = require("lodash");
 const _ = require("lodash")
   , db = require('../utils/db')
   , { cloudinary } = require("../utils/cloudinary")
@@ -66,6 +65,7 @@ exports.getProducts = async (req, res) => {
     }
 
     sqlQuery += where
+    sqlQuery += q.sid ? '' : ` AND is_active = 1`
     sqlQuery += ` LIMIT ${offset},${limit}`
     sqlCount += where
     // console.log(sqlQuery)
@@ -303,6 +303,22 @@ exports.updateProduct = async (req, res) => {
   }
 }
 
+exports.activateProduct = (req, res) => {
+  try {
+    let { active } = req.query
+      , { id } = req.params
+    db.execute(db.partsku, `UPDATE products SET is_active = ${active} WHERE pid = ${id}`).then(result => {
+      res.json("Update Success")
+    }).catch(e => {
+      console.log("DB ERROR", e)
+      res.status(500).json(e)
+    })
+  } catch (e) {
+    console.log("ERROR", e)
+    res.status(500).json(e)
+  }
+}
+
 exports.deleteProduct = async (req, res) => {
   try {
     console.log(req)
@@ -340,13 +356,19 @@ exports.getProductRating = async (req, res) => {
   }
 }
 
-exports.submitReview = async (req, res) => {
+exports.submitReview = (req, res) => {
   try {
     let data = req.body
 
-    db.execute(db.partsku, `INSERT INTO ratings SET ?`, data).then(response => {
+    db.execute(db.partsku, `INSERT INTO ratings SET ?`, data).then(async response => {
       db.execute(db.partsku, `UPDATE transaction_log SET rated = ${response.insertId} WHERE id = ${data.tlog_id}`)
-      console.log('response', response)
+      let ratings = await db.execute(db.partsku, `SELECT pid, rate FROM ratings WHERE pid = ${data.pid}`)
+        , avg = 0
+
+      for(let x of ratings) avg = avg + x.rate
+      avg = avg / ratings.length
+      db.execute(db.partsku, `UPDATE products SET rating = ${avg}, times_rated = times_rated + 1 WHERE pid = ${data.pid}`)
+
       res.json(response)
     }).catch(e => {
       console.log('DB ERROR', e)
