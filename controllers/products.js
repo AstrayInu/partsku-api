@@ -21,13 +21,11 @@ exports.getProducts = async (req, res) => {
     if(q.sid) {
       where += ` AND sid = ?`
       arg.push(q.sid)
-    } else {
-      where += ` AND is_active = 1`
     }
 
     if(q.q) {
       let edit = q.q.toUpperCase().replace(' ', '%')
-      where +=  ` AND brand LIKE "%${edit}%" OR name LIKE "%${edit}%" OR sku LIKE "%${edit}%" OR description LIKE "%${edit}%" OR attributes ->> '$.carType' LIKE "%${edit}%"`
+      where +=  ` AND (brand LIKE "%${edit}%" OR name LIKE "%${edit}%" OR sku LIKE "%${edit}%" OR description LIKE "%${edit}%" OR attributes ->> '$.carType' LIKE "%${edit}%")`
       // for(let i=0 ; i<4 ; i++) arg.push(q.q)
     }
 
@@ -67,6 +65,7 @@ exports.getProducts = async (req, res) => {
     }
 
     sqlQuery += where
+    sqlQuery += q.sid ? '' : ` AND is_active = 1`
     sqlQuery += ` LIMIT ${offset},${limit}`
     sqlCount += where
     // console.log(sqlQuery)
@@ -315,7 +314,7 @@ exports.activateProduct = (req, res) => {
       res.status(500).json(e)
     })
   } catch (e) {
-    console.log("ERROR", e)
+    console.log("DB ERROR", e)
     res.status(500).json(e)
   }
 }
