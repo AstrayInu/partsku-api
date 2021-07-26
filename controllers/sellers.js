@@ -15,8 +15,8 @@ exports.getSellers = async (req, res) => {
   try {
     let q = req.query
       , sql = `SELECT * FROM sellers WHERE 1`
-      , where = ``
-      , args = []
+      // , where = ``
+      // , args = []
     // console.log(q)
     if(q.admin == 1) {
       let newSellers = await db.execute(db.partsku, `SELECT * FROM sellers WHERE status = 0`)
@@ -47,7 +47,7 @@ exports.getSellerData = (req, res) => {
         // console.log("ITEM",item)
         res.json(item)
       } else {
-        res.status(400).json({err: `Seller not found`})
+        res.status(404).json({err: `Seller not found`})
       }
     }).catch(e => {
       console.log("Error",e)
@@ -56,6 +56,20 @@ exports.getSellerData = (req, res) => {
   } catch (e) {
     console.log("ErroR", e)
     res.status(400).json({err: e})
+  }
+}
+
+exports.getSellerStatus = (req, res) => {
+  try{
+    let {uid} = req.params
+
+    db.execute(db.partsku, `SELECT status FROM sellers WHERE uid = ${uid}`).then(result => {
+      if(result.length > 0) res.json(result[0])
+      else res.json({err: `Seller with uid = ${uid} is not found`})
+    })
+  } catch(e) {
+    console.log(e)
+    res.status(500).json(e)
   }
 }
 

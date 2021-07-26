@@ -409,7 +409,7 @@ exports.changePassword = async (req, res) => {
   }
 }
 
-exports.updateCart = async (req, res) => {
+exports.addToCart = async (req, res) => {
   try {
     let { uid, pid, quantity } = req.body
       , sql
@@ -432,6 +432,22 @@ exports.updateCart = async (req, res) => {
   }
 }
 
+exports.updateCart = (req, res) => {
+  try {
+    let data = req.body
+
+    data.forEach(x => {
+      db.execute(db.partsku, `UPDATE cart SET quantity = ${x.quantity} WHERE uid = ${x.uid} AND pid = ${x.pid}`).catch(e => {
+        res.status(500).json(e)
+      })
+    })
+
+    res.json("Update Success")
+  } catch (e) {
+
+  }
+}
+
 exports.getCartData = async (req, res) => {
   try {
     let { id } = req.params
@@ -446,7 +462,7 @@ exports.getCartData = async (req, res) => {
                     WHERE c.uid = ${id}`
     let data = await db.execute(db.partsku, sql)
       , seller = await db.execute(db.partsku, sellerSql)
-    
+
     data.forEach(x => {
       x.attr = JSON.parse(x.attr)
       x.imgUrl = x.attr.imgUrl[0]
@@ -464,7 +480,7 @@ exports.deleteCartItem = async (req, res) => {
   try {
     let {uid, pid} = req.body
     // console.log("=========>", req.body)
-    
+
     db.execute(db.partsku, `DELETE FROM cart WHERE uid = ${uid} AND pid = ${pid}`).then( result => {
       res.json("Deleted item successfuly")
     }).catch(e => {

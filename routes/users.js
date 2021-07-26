@@ -28,7 +28,8 @@ router.post("/forgot-password", user.sendEmailForgotPassword)
 router.post("/reset-password", user.resetPassword)
 
 router.get("/cart/:id", user.getCartData)
-router.post("/cart/add", user.updateCart)
+router.post("/cart/add", user.addToCart)
+router.put("/cart/update", user.updateCart)
 router.delete("/cart/delete", user.deleteCartItem)
 
 module.exports = router;

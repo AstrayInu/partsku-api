@@ -138,18 +138,20 @@ exports.getTransaction = async (req, res) => {
   }
 }
 
-exports.newTransaction = async (req, res) => {
+exports.newTransaction = (req, res) => {
   try {
     let body = req.body
       , input = {transaction_id: body.transaction_id, total_price: body.total_price, uid: body.uid, type: 'BCA', status: 0, approval: 0, trf_proof: '', shipment_status: 0}
     // console.log("data",body.cartData)
 
-    for(let x of body.cartData.data) {
-      console.log(x)
-      input.pid = x.pid
-      input.sid = x.sid
-      input.quantity = x.quantity
-      await db.execute(db.partsku, `INSERT INTO transaction_log SET ?`, input).catch(e => {
+    if(body.buynow) {
+      let data = body.cartData
+        , d = new Date()
+      input.pid = data.pid
+      input.sid = data.sid
+      input.quantity = data.quantity
+
+      db.execute(db.partsku, `INSERT INTO transaction_log SET ?`, input).catch(e => {
         console.log('DB CATCH', e)
         res.status(500).json(e)
       })
@@ -157,11 +159,26 @@ exports.newTransaction = async (req, res) => {
         console.log('DB CATCH 2', e)
         res.status(500).json(e)
       })
+    } else {
+      for(let x of body.cartData.data) {
+        // console.log(x)
+        input.pid = x.pid
+        input.sid = x.sid
+        input.quantity = x.quantity
+        db.execute(db.partsku, `INSERT INTO transaction_log SET ?`, input).catch(e => {
+          console.log('DB CATCH', e)
+          res.status(500).json(e)
+        })
+        db.execute(db.partsku, `DELETE FROM cart WHERE uid = ${body.uid}`).catch(e => {
+          console.log('DB CATCH 2', e)
+          res.status(500).json(e)
+        })
+      }      
     }
 
     res.json("Transaksi telah diterima!\nSilahkan upload bukti pembayaran di halaman berikutnya")
   } catch (e) {
-    console.log('CATCH', e)
+    console.log('CATCH ==============', e)
     res.status(500).json("Whoops something went wrong back there :(")
   }
 }
