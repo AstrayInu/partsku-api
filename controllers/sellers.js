@@ -21,7 +21,7 @@ exports.getSellers = async (req, res) => {
     if(q.admin == 1) {
       let newSellers = await db.execute(db.partsku, `SELECT * FROM sellers WHERE status = 0`)
         , approved = await db.execute(db.partsku, `SELECT * FROM sellers WHERE status = 1`)
-      
+
       newSellers.forEach(x => {x.attributes = JSON.parse(x.attributes)})
       approved.forEach(x => {x.attributes = JSON.parse(x.attributes)})
 
@@ -100,7 +100,7 @@ exports.getSellerDataUID = (req, res) => {
 
 exports.createSeller = async (req, res) => {
   try {
-    let { shopName, waNum, papToko, papKtp, shopAddress, uid } = req.body
+    let { shopName, waNum, papToko, papKtp, ktpNum, shopAddress, uid } = req.body
 
     // check if shop name already exists
     let check = await db.execute(db.partsku, `SELECT sid FROM sellers WHERE attributes ->> '$.url' = ?`, shopName)
@@ -136,7 +136,8 @@ exports.createSeller = async (req, res) => {
       address: shopAddress,
       url: linkToko,
       store_pic: papToko,
-      ktp_pic: papKtp
+      ktp_pic: papKtp,
+      ktpNum
     }
 
     let setData = {
@@ -163,6 +164,28 @@ exports.createSeller = async (req, res) => {
   } catch(e) {
     res.status(500).json(e)
     console.log("TRY ERROR", e)
+  }
+}
+
+exports.updateSeller = async (req, res) => {
+  try {
+    let {sid} = req.params
+      , data = req.body
+      , seller = await db.execute(db.partsku, `SELECT * FROM sellers WHERE sid = ${sid}`)
+    seller = _.reduce(seller)
+    seller.attributes = JSON.parse(seller.attributes)
+    seller.attributes.waNum = data.waNum ? data.waNum : seller.attributes.waNum
+    seller.attributes.address = data.shopAddress ? data.shopAddress : seller.attributes.address
+    seller.updated_at = new Date()
+    seller.attributes = JSON.stringify(seller.attributes)
+
+    await db.execute(db.partsku, `UPDATE sellers SET ? WHERE sid = ${sid}`, seller).then(result => {
+      // console.log('result', result)
+      res.json("Update Success")
+    })
+  } catch (e) {
+    console.log('e', e)
+    res.status(500).json(e)
   }
 }
 

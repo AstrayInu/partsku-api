@@ -102,8 +102,10 @@ exports.getSingleProduct = async (req, res) => {
     let product = _.reduce(data)
     product.attributes = JSON.parse(product.attributes)
     let seller = await db.execute(db.partsku, `SELECT * FROM sellers WHERE sid = ?`, product.sid)
+      , productCount = await db.execute(db.partsku, `SELECT COUNT(*) as num FROM products WHERE sid = ${product.sid}`)
     seller = _.reduce(seller)
     seller.attributes = JSON.parse(seller.attributes)
+    seller.productCount = _.reduce(productCount).num
     response = {
       product,
       seller,
