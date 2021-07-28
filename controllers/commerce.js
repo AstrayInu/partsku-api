@@ -138,11 +138,11 @@ exports.getTransaction = async (req, res) => {
   }
 }
 
-exports.newTransaction = (req, res) => {
+exports.newTransaction = async (req, res) => {
   try {
     let body = req.body
       , input = {transaction_id: body.transaction_id, total_price: body.total_price, uid: body.uid, type: 'BCA', status: 0, approval: 0, trf_proof: '', shipment_status: 0}
-    // console.log("data",body.cartData)
+    // console.log("data",body)
 
     if(body.buynow) {
       let data = body.cartData
@@ -165,11 +165,11 @@ exports.newTransaction = (req, res) => {
         input.pid = x.pid
         input.sid = x.sid
         input.quantity = x.quantity
-        db.execute(db.partsku, `INSERT INTO transaction_log SET ?`, input).catch(e => {
+        await db.execute(db.partsku, `INSERT INTO transaction_log SET ?`, input).catch(e => {
           console.log('DB CATCH', e)
           res.status(500).json(e)
         })
-        db.execute(db.partsku, `DELETE FROM cart WHERE uid = ${body.uid}`).catch(e => {
+        await db.execute(db.partsku, `DELETE FROM cart WHERE uid = ${body.uid}`).catch(e => {
           console.log('DB CATCH 2', e)
           res.status(500).json(e)
         })
