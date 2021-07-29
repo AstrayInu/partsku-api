@@ -140,9 +140,9 @@ exports.setApproval = async (req, res) => {
     }
     // console.log(sql)
     // console.log(cont)
-    db.execute(db.partsku, sql, data).then(result => {
+    db.execute(db.partsku, sql, data).then(async result => {
       if(data.shipment_status == 1) {
-        db.execute(db.partsku, `UPDATE products SET stock = stock - ${quantity}, sold = sold + ${quantity} WHERE pid = ${pid}`)
+        await db.execute(db.partsku, `UPDATE products SET stock = stock - ${quantity}, sold = sold + ${quantity} WHERE pid = ${pid}`)
       }
       res.json("Transaction updated!")
     }).catch(e => {
