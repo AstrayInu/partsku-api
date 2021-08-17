@@ -201,8 +201,8 @@ exports.createProduct = async (req, res) => {
         sid: data.sid,
         category: data.category,
         is_active: 1, // default to active
-        preorder: data.preorder ? data.preorder : 0,
-        status: data.stock > 0 ? 1 : 0, // 0 = not ready ; 1 = ready ; 2 = pre-order
+        // preorder: data.preorder ? data.preorder : 0,
+        // status: data.stock > 0 ? 1 : 0, // 0 = not ready ; 1 = ready ; 2 = pre-order
         condition: data.condition, // used or new
         brand: data.brand.split(".")[0],
         sku: data.sku.trim(),
