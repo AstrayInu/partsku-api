@@ -76,7 +76,7 @@ exports.createUser = async (req, res) => {
 
           // return success
           const returnData = {
-            msg: `Registrasi berhasil!`
+            msg: `Registration Success!`
           }
           res.json(returnData)
         }).catch(e => {

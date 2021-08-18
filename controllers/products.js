@@ -45,6 +45,10 @@ exports.getProducts = async (req, res) => {
       }
     }
     
+    if(q.category) {
+      where += ` AND category LIKE "%${q.category}%"`
+    }
+
     sqlQuery += q.sid ? '' : ` AND is_active = 1`
 
     if(sort) {
@@ -244,7 +248,7 @@ exports.createProduct = async (req, res) => {
         // res.json(e)
       })
   } catch (e) {
-    // res.status(400).json(e)
+    res.status(400).json(e)
     console.log(e)
     // res.json(e) // for dev usage
   }
