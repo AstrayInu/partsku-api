@@ -198,17 +198,16 @@ exports.createTMPImage = async (req, res) => {
 exports.createProduct = async (req, res) => {
   try {
     let data = req.body
-    // console.log("====>", data)
+    // console.log("====>", Array.isArray(data.category))
     let sql = `INSERT INTO products SET ?`
       , urlName = data.name.toLowerCase().replace(/\/|\ |\./g,'-')
       , usedData = {
         sid: data.sid,
-        category: data.category,
+        category: Array.isArray(data.category) ? data.category.join() : data.category,
         is_active: 1, // default to active
         // preorder: data.preorder ? data.preorder : 0,
         // status: data.stock > 0 ? 1 : 0, // 0 = not ready ; 1 = ready ; 2 = pre-order
         condition: data.condition, // used or new
-        brand: data.brand.split(".")[0],
         sku: data.sku.trim(),
         name: data.name.trim(),
         description: data.description,
@@ -219,7 +218,23 @@ exports.createProduct = async (req, res) => {
       , imgUrl = []
       , attributes = {
         urlName,
-        carType: data.brand.split(".")[1]
+        carType: data.brand.map(x => {
+          return x.split('.')[1]
+        })
+      }
+      , arr, newArr = []
+
+      if(Array.isArray(data.brand)) {
+        // console.log('data.brand', data.brand)
+        arr = data.brand.map(x => {
+          return x.split('.')[0]
+        })
+        for(let i=0 ; i<arr.length-1 ; i++) {
+          if(i != 0) {
+            if(arr[i] != arr[i-1]) newArr.push(arr[i])
+          } else newArr.push(arr[i])
+        }
+        usedData.brand = newArr.join()
       }
 
       // NOTE
@@ -240,7 +255,7 @@ exports.createProduct = async (req, res) => {
         // put code for admin notif here
 
         res.json({
-          msg: "Produk berhasil dibuat!",
+          msg: "Produk added!",
           id: result.insertId
         })
       }).catch(e => {

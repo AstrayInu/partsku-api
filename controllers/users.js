@@ -27,7 +27,7 @@ exports.createUser = async (req, res) => {
     } else {
       if(!email.match(/^[a-zA-Z0-9.+_-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/)) {
         res.status(400).json({
-          error: 'Format email tidak valid!'
+          error: 'Email format is invalid!'
         })
       }
 
@@ -86,7 +86,7 @@ exports.createUser = async (req, res) => {
 
       } else {
         res.status(400).json({
-          error: '*Password minimal 8 karakter dan harus mengandung setidaknya 1 huruf besar, 1 huruf kecil, dan 1 digit angka.'
+          error: '*Password requires at least 8 characters, 1 UPPERCASE, 1 lowercase and 1 number'
         })
       }
     }
@@ -159,8 +159,8 @@ exports.updateUserData = async (req, res) => {
         let checkEmailDuplication = result.filter(x => (x.uid != uid && x.email === email))
         let checkPhoneDuplication = result.filter(x => (x.uid != uid && x.phonenumber === phone_number))
 
-        if (checkEmailDuplication.length > 0) return { code: 403, msg: "Maaf, Email Sudah Digunakan." }
-        else if (checkPhoneDuplication.length > 0) return { code: 403, msg: "Maaf, Nomor Telepon Sudah Digunakan." }
+        if (checkEmailDuplication.length > 0) return { code: 403, msg: "Email is used in another account" }
+        else if (checkPhoneDuplication.length > 0) return { code: 403, msg: "Phone number already used" }
         else return null;
       })
       // console.log(emailCheck)

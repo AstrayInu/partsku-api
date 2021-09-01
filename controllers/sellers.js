@@ -104,7 +104,7 @@ exports.createSeller = async (req, res) => {
 
     // check if shop name already exists
     let check = await db.execute(db.partsku, `SELECT sid FROM sellers WHERE attributes ->> '$.url' = ?`, shopName)
-    if(check.length > 0) res.status(400).json({error: 'Nama toko sudah terdaftar'})
+    if(check.length > 0) res.status(400).json({error: 'Shop name already used'})
 
     let checkUid = await db.execute(db.partsku, `SELECT uid FROM sellers WHERE uid = ?`, uid)
     if(checkUid.length > 0) res.status(400).json({error: `Anda sudah terdaftar menjadi seller`})
@@ -153,7 +153,7 @@ exports.createSeller = async (req, res) => {
       // console.log("=====>", response)
       setData.attributes = JSON.parse(setData.attributes)
       res.json({
-        msg: 'Registrasi berhasil!',
+        msg: 'Registration success',
         data: setData,
         sid: response.insertId,
         response
