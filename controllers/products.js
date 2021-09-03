@@ -255,7 +255,7 @@ exports.createProduct = async (req, res) => {
         // put code for admin notif here
 
         res.json({
-          msg: "Produk added!",
+          msg: "Product added!",
           id: result.insertId
         })
       }).catch(e => {
